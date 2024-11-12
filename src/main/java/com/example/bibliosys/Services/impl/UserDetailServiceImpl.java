@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -19,9 +20,11 @@ import org.springframework.stereotype.Service;
 import com.example.bibliosys.Models.User;
 import com.example.bibliosys.Models.request.AuthCreateUserRequest;
 import com.example.bibliosys.Models.request.AuthLoginRequest;
+import com.example.bibliosys.Models.request.user.UserCreateRequest;
 import com.example.bibliosys.Models.response.ApiResponse;
 import com.example.bibliosys.Models.response.AuthResponse;
 import com.example.bibliosys.Repository.UserRepository;
+import com.example.bibliosys.Services.EmailService;
 import com.example.bibliosys.utils.JwtUtils;
 
 @Service
@@ -34,6 +37,12 @@ public class UserDetailServiceImpl implements UserDetailsService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
@@ -177,4 +186,19 @@ public class UserDetailServiceImpl implements UserDetailsService {
         }
         return false;
     }
+
+    public ApiResponse<Void> sendEmailResetPassword(UserCreateRequest userRequest) {
+        String resetLink = frontendUrl + "/reset-password?email=" + userRequest.getCorreo();
+        String emailContent = emailService.buildEmailContent("Usuario",
+                "Enlace para restablecer contraseña:",
+                resetLink);
+        emailService.sendSimpleMessage(userRequest.getCorreo(), "Restablecer Contraseña", emailContent);
+    
+        return ApiResponse.<Void>builder()
+                .data(null)
+                .message("Correo de restablecimiento de contraseña enviado exitosamente")
+                .build();
+    }
+    
+    
 }

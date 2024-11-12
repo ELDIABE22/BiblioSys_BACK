@@ -42,4 +42,14 @@ public class EmailService {
                 "</div>" +
                 "</div>";
     }
+
+    public String buildEmailLoanContent(String userName, String bookTitle, String returnDate) {
+        return "<div style=\"font-family: Arial, sans-serif; font-size: 16px; color: #333;\">"
+                + "<div style=\"background-color: #1b4dff; color: #fff; padding: 10px 20px; text-align: center;\">"
+                + "<h1 style=\"margin: 0;\">BiblioSys</h1>" + "</div>" + "<div style=\"padding: 20px;\">"
+                + "<h2 style=\"color: #1b4dff;\">Hola " + userName + ",</h2>"
+                + "<p>Has prestado el libro titulado <strong>" + bookTitle + "</strong>.</p>"
+                + "<p>Por favor, devuelve el libro antes del: <strong>" + returnDate + "</strong>.</p>"
+                + "<p>Gracias,<br/>El equipo de BiblioSys</p>" + "</div>" + "</div>";
+    }
 }

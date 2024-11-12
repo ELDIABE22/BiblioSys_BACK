@@ -5,16 +5,24 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.example.bibliosys.Models.Loan;
+import com.example.bibliosys.Models.Student;
+import com.example.bibliosys.Models.User;
 import com.example.bibliosys.Models.request.loan.LoanRequest;
 import com.example.bibliosys.Models.response.ApiResponse;
 import com.example.bibliosys.Models.response.loan.LoanResponse;
 import com.example.bibliosys.Models.response.loan.loanBookResponse;
 import com.example.bibliosys.Models.response.loan.loanFetchResponse;
 import com.example.bibliosys.Models.response.loan.loanStudentResponse;
+import com.example.bibliosys.Repository.StudentRepository;
+import com.example.bibliosys.Repository.UserRepository;
+import com.example.bibliosys.Services.EmailService;
 import com.example.bibliosys.Services.LoanService;
 
 import jakarta.persistence.EntityManager;
@@ -25,6 +33,12 @@ import jakarta.persistence.StoredProcedureQuery;
 public class LoanServiceImpl implements LoanService {
         @Autowired
         private EntityManager entityManager;
+
+        @Autowired
+        private EmailService emailService;
+
+        @Autowired 
+        private StudentRepository studentRepository;
 
         @Override
         public List<loanFetchResponse> fetchAllLoansService() {
@@ -96,6 +110,19 @@ public class LoanServiceImpl implements LoanService {
                                 .fechaDevolucion(loanRequest.getFechaDevolucion())
                                 .estado(loanRequest.getEstado())
                                 .build();
+
+                Optional<Student> estudianteOpt = studentRepository.findById(loanRequest.getIdEstudiante()); 
+                if (estudianteOpt.isPresent()) { 
+                        Student estudiante = estudianteOpt.get(); 
+                        String correoEstudiante = estudiante.getCorreo();
+
+                        String emailContent = emailService.buildEmailLoanContent( 
+                                estudiante.getNombres(), 
+                                "Título del Libro",
+                                 loanRequest.getFechaDevolucion().toString());
+
+                        emailService.sendSimpleMessage(correoEstudiante, "Préstamo de Libro", emailContent);
+                 }
 
                 return ApiResponse.<LoanResponse>builder()
                                 .data(loanResponse)
