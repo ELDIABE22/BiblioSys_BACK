@@ -21,7 +21,7 @@ public class EmailService {
             helper.setFrom("jeronimo.jsa.133@gmail.com");
             helper.setTo(to);
             helper.setSubject(subject);
-            helper.setText(text, true); // Enable HTML
+            helper.setText(text, true);
             emailSender.send(message);
         } catch (MessagingException e) {
             e.printStackTrace();
@@ -50,6 +50,18 @@ public class EmailService {
                 + "<h2 style=\"color: #1b4dff;\">Hola " + userName + ",</h2>"
                 + "<p>Has prestado el libro titulado <strong>" + bookTitle + "</strong>.</p>"
                 + "<p>Por favor, devuelve el libro antes del: <strong>" + returnDate + "</strong>.</p>"
-                + "<p>Gracias,<br/>El equipo de BiblioSys</p>" + "</div>" + "</div>";
+                + "<p style=\"color: #1b4dff;\">Gracias,<br/>El equipo de BiblioSys</p>" 
+                + "</div>" 
+                + "</div>";
+    }
+
+    public String buildOverdueLoanEmailContent(String message) {
+        return "<div style=\"font-family: Arial, sans-serif; font-size: 16px; color: #333;\">"
+                + "<div style=\"background-color: #1b4dff; color: #fff; padding: 10px 20px; text-align: center;\">"
+                + "<h1 style=\"margin: 0;\">BiblioSys</h1>" + "</div>" + "<div style=\"padding: 20px;\">"
+                + message
+                + "<p style=\"color: #1b4dff;\">Gracias,<br/>El equipo de BiblioSys</p>" 
+                + "</div>" 
+                + "</div>";
     }
 }

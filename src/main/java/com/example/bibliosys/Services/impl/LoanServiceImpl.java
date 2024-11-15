@@ -8,20 +8,19 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.example.bibliosys.Models.Loan;
+import com.example.bibliosys.Models.Book;
 import com.example.bibliosys.Models.Student;
-import com.example.bibliosys.Models.User;
 import com.example.bibliosys.Models.request.loan.LoanRequest;
 import com.example.bibliosys.Models.response.ApiResponse;
 import com.example.bibliosys.Models.response.loan.LoanResponse;
 import com.example.bibliosys.Models.response.loan.loanBookResponse;
 import com.example.bibliosys.Models.response.loan.loanFetchResponse;
+import com.example.bibliosys.Models.response.loan.loanOverdueResponse;
 import com.example.bibliosys.Models.response.loan.loanStudentResponse;
+import com.example.bibliosys.Repository.BookRepository;
 import com.example.bibliosys.Repository.StudentRepository;
-import com.example.bibliosys.Repository.UserRepository;
 import com.example.bibliosys.Services.EmailService;
 import com.example.bibliosys.Services.LoanService;
 
@@ -37,8 +36,11 @@ public class LoanServiceImpl implements LoanService {
         @Autowired
         private EmailService emailService;
 
-        @Autowired 
+        @Autowired
         private StudentRepository studentRepository;
+
+        @Autowired
+        private BookRepository bookRepository;
 
         @Override
         public List<loanFetchResponse> fetchAllLoansService() {
@@ -76,6 +78,39 @@ public class LoanServiceImpl implements LoanService {
         }
 
         @Override
+        public List<loanOverdueResponse> fetchLoansOverdueService() {
+                // Ejecutar el procedimiento de actualización
+                StoredProcedureQuery updateQuery = entityManager
+                                .createStoredProcedureQuery("sp_ActualizarPrestamosVencidos");
+                updateQuery.execute();
+
+                // Obtener los préstamos vencidos
+                StoredProcedureQuery query = entityManager.createStoredProcedureQuery("sp_ObtenerPrestamosVencidos");
+
+                @SuppressWarnings("unchecked")
+                List<Object[]> loansOverdue = query.getResultList();
+
+                Map<Integer, loanOverdueResponse> loanMap = new HashMap<>();
+
+                for (Object[] row : loansOverdue) {
+                        Integer bookId = (Integer) row[1];
+                        loanMap.computeIfAbsent(bookId, id -> {
+                                return loanOverdueResponse.builder()
+                                                .idEstudiante((Integer) row[0])
+                                                .idLibro(bookId)
+                                                .nombresEstudiante((String) row[2])
+                                                .apellidosEstudiante((String) row[3])
+                                                .correoEstudiante((String) row[4])
+                                                .fechaPrestamo((Date) row[5])
+                                                .fechaDevolucion((Date) row[6])
+                                                .build();
+                        });
+                }
+
+                return new ArrayList<>(loanMap.values());
+        }
+
+        @Override
         public ApiResponse<LoanResponse> newLoanService(LoanRequest loanRequest) {
                 StoredProcedureQuery query = entityManager.createStoredProcedureQuery("sp_InsertarPrestamo")
                                 .registerStoredProcedureParameter("IdLibro", Integer.class, ParameterMode.IN)
@@ -96,7 +131,8 @@ public class LoanServiceImpl implements LoanService {
 
                 if ("El libro no existe.".equals(mensajeSalida)
                                 || "El estudiante no existe.".equals(mensajeSalida)
-                                || "El libro ya está prestado y no ha sido devuelto.".equals(mensajeSalida)) {
+                                || "El libro ya está prestado y no ha sido devuelto.".equals(mensajeSalida)
+                                || "El usuario ya tiene un libro prestado.".equals(mensajeSalida)) {
                         return ApiResponse.<LoanResponse>builder()
                                         .data(null)
                                         .message(mensajeSalida)
@@ -111,18 +147,16 @@ public class LoanServiceImpl implements LoanService {
                                 .estado(loanRequest.getEstado())
                                 .build();
 
-                Optional<Student> estudianteOpt = studentRepository.findById(loanRequest.getIdEstudiante()); 
-                if (estudianteOpt.isPresent()) { 
-                        Student estudiante = estudianteOpt.get(); 
-                        String correoEstudiante = estudiante.getCorreo();
+                Optional<Book> bookOpt = bookRepository.findById(loanRequest.getIdLibro());
+                Optional<Student> studentOpt = studentRepository.findById(loanRequest.getIdEstudiante());
+                if (studentOpt.isPresent() | bookOpt.isPresent()) {
+                        String emailContent = emailService.buildEmailLoanContent(
+                                        studentOpt.get().getNombres(),
+                                        bookOpt.get().getTitulo(),
+                                        loanRequest.getFechaDevolucion().toString());
 
-                        String emailContent = emailService.buildEmailLoanContent( 
-                                estudiante.getNombres(), 
-                                "Título del Libro",
-                                 loanRequest.getFechaDevolucion().toString());
-
-                        emailService.sendSimpleMessage(correoEstudiante, "Préstamo de Libro", emailContent);
-                 }
+                        emailService.sendSimpleMessage(studentOpt.get().getCorreo(), "Préstamo de Libro", emailContent);
+                }
 
                 return ApiResponse.<LoanResponse>builder()
                                 .data(loanResponse)
@@ -200,4 +234,17 @@ public class LoanServiceImpl implements LoanService {
                                 .message(mensajeSalida)
                                 .build();
         }
+
+        @Override
+        public ApiResponse<Void> sendMailLoanOverdueService(String correo, String message) {
+                String emailContent = emailService.buildOverdueLoanEmailContent(message);
+
+                emailService.sendSimpleMessage(correo, "Devolución de Libro", emailContent);
+
+                return ApiResponse.<Void>builder()
+                                .data(null)
+                                .message("Correo electrónico enviado.")
+                                .build();
+        }
+
 }

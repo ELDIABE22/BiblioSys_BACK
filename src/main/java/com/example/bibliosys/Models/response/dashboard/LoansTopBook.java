@@ -11,9 +11,7 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CountEntityResponse {
-    private Integer totalPrestamos;
-    private Integer totalLibros;
-    private Integer totalEstudiantes;
-    private Integer totalUsuarios;
+public class LoansTopBook {
+    private String libro;
+    private Integer total;
 }

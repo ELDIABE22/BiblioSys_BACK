@@ -1,7 +1,7 @@
 package com.example.bibliosys.Services;
 
-import com.example.bibliosys.Models.response.dashboard.CountEntityResponse;
+import com.example.bibliosys.Models.response.dashboard.DashboardResponse;
 
 public interface DashboardService {
-    CountEntityResponse fetchCountEntityService();
+    public DashboardResponse fetchDashboardDataService();
 }

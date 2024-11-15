@@ -41,6 +41,27 @@ JOIN
     Libro l ON p.IdLibro = l.Id;
 GO
 
+-- VISTA PARA OBTENER LOS PRESTAMOS VENCIDOS
+CREATE VIEW vw_ObtenerPrestamosVencidos AS
+SELECT 
+    E.Id AS idEstudiante,
+	L.Id AS idLibro,
+    E.Nombres AS nombresEstudiante,
+    E.Apellidos AS apellidosEstudiante,
+    E.Correo AS correoEstudiante,
+    P.FechaPrestamo AS fechaPrestamo,
+    P.FechaDevolucion AS fechaDevolucion
+FROM
+    Prestamo P
+INNER JOIN 
+    Estudiante E ON P.IdEstudiante = E.Id
+INNER JOIN
+	Libro L ON P.IdLibro = L.Id
+WHERE 
+    P.Estado = 'Vencido'
+    OR (P.FechaDevolucion < GETDATE() AND P.Estado != 'Devuelto');
+GO
+
 -- VISTA PARA OBTENER TOTAL DEL PRESTAMO, LIBRO, ESTUDIANTE Y USUARIOS
 CREATE VIEW vw_DetallesPanel
 AS
@@ -49,4 +70,45 @@ SELECT
     (SELECT COUNT(*) FROM Libro) AS TotalLibros,
     (SELECT COUNT(*) FROM Estudiante) AS TotalEstudiantes,
     (SELECT COUNT(*) FROM Usuario) AS TotalUsuarios;
+
+-- VISTA PARA OBTENER LA CANTIDAD DE PRESTAMOS POR DIA
+CREATE VIEW vw_CantidadPrestamosPorDia
+AS
+SELECT 
+    CONVERT(VARCHAR, FechaPrestamo, 23) AS Dia, -- YYYY-MM-DD
+    COUNT(*) AS CantidadPrestamos
+FROM 
+    Prestamo
+GROUP BY 
+    CONVERT(VARCHAR, FechaPrestamo, 23);
+GO
+
+-- VISTA PARA OBTENER LA CANTIDAD DE PRESTAMOS POR MES
+CREATE VIEW vw_CantidadPrestamosPorMes
+AS
+SELECT 
+    MONTH(FechaPrestamo) AS Mes,
+    COUNT(*) AS CantidadPrestamos
+FROM 
+    Prestamo
+GROUP BY 
+    YEAR(FechaPrestamo),
+    MONTH(FechaPrestamo);
+GO
+
+-- VISTA PARA OBTENER LA TOP 5 LIBROS MAS PRESTADOS
+CREATE VIEW Top5LibrosMasPrestados AS
+SELECT TOP 5
+    L.Titulo AS NombreDelLibro,
+    COUNT(P.Id) AS CantidadDePrestamos
+FROM 
+    Libro L
+JOIN 
+    Prestamo P ON L.Id = P.IdLibro
+GROUP BY 
+    L.Titulo
+ORDER BY 
+    CantidadDePrestamos DESC;
+GO
+
 

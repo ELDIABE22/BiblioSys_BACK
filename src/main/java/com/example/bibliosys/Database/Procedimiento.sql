@@ -41,9 +41,6 @@ BEGIN
 END;
 GO
 
-EXEC sp_InsertarLibroAutor 1, 1;
-GO
-
 -- PROCEDIMIENTO PARA INSERTAR MATERIAS DEL LIBRO
 CREATE PROCEDURE sp_InsertarLibroMateria
     @IdLibro INT,
@@ -78,9 +75,6 @@ BEGIN
 END;
 GO
 
-EXEC sp_InsertarLibroMateria 1, 1;
-GO
-
 -- PROCEDIMIENTO PARA INSERTAR LIBRO
 CREATE PROCEDURE sp_InsertarLibro
     @Titulo VARCHAR(150),
@@ -112,15 +106,6 @@ END;
 GO
 
 -- PROCEDIMIENTO PARA ELIMINAR LIBRO
-EXEC CrearLibro
-    @Titulo = 'El título del libro',
-    @Descripcion = 'Una descripción breve del libro',
-    @ISBN = '123-4567890123',
-    @Genero = 'Ficción',
-    @Año_Publicacion = 2024,
-    @Foto = 'URL/de/la/foto.jpg',
-GO
-
 CREATE PROCEDURE sp_EliminarLibro
     @LibroId INT,
     @MensajeSalida VARCHAR(255) OUTPUT
@@ -138,6 +123,8 @@ BEGIN
     -- Eliminar relaciones con autores y materias si existen
     DELETE FROM LibroAutor WHERE IdLibro = @LibroId;
     DELETE FROM LibroMateria WHERE IdLibro = @LibroId;
+
+    DELETE FROM Prestamo WHERE IdLibro = @IdLibro;
 
     -- Eliminar el libro
     DELETE FROM Libro WHERE Id = @LibroId;
@@ -488,8 +475,20 @@ BEGIN
         RETURN;
     END
 
+    -- Validar si el usuario ya tiene un libro prestado
+    IF EXISTS (SELECT 1 FROM Prestamo WHERE IdEstudiante = @IdEstudiante AND Estado != 'Devuelto')
+    BEGIN
+        SET @MensajeSalida = 'El usuario ya tiene un libro prestado.';
+        RETURN;
+    END
+
     INSERT INTO Prestamo (IdLibro, IdEstudiante, FechaPrestamo, FechaDevolucion)
     VALUES (@IdLibro, @IdEstudiante, @FechaPrestamo, @FechaDevolucion);
+
+    -- Actualizar el estado del libro a 'Prestado' 
+    UPDATE Libro
+    SET Estado = 'Prestado'
+    WHERE Id = @IdLibro;
 
     SET @MensajeSalida = 'Préstamo registrado.';
 END;
@@ -519,9 +518,15 @@ BEGIN
         RETURN;
     END
 
-        DELETE FROM Prestamo WHERE Id = @PrestamoId;
+    DECLARE @IdLibro INT;
 
-		SET @MensajeSalida = 'Préstamo eliminado.';
+    SELECT @IdLibro = IdLibro FROM Prestamo WHERE Id = @PrestamoId;
+
+    DELETE FROM Prestamo WHERE Id = @PrestamoId;
+
+    UPDATE Libro SET Estado = 'Disponible' WHERE Id = @IdLibro;
+
+	SET @MensajeSalida = 'Préstamo eliminado.';
 END;
 GO
 
@@ -559,6 +564,13 @@ BEGIN
         RETURN;
     END
 
+    -- Validar si el libro ya está prestado
+    IF EXISTS (SELECT 1 FROM Prestamo WHERE IdLibro = @IdLibro AND IdEstudiante != @IdEstudiante AND Estado != 'Devuelto')
+    BEGIN
+        SET @MensajeSalida = 'El libro ya está prestado y no ha sido devuelto.';
+        RETURN;
+    END
+
     UPDATE Prestamo
     SET 
         IdLibro = @IdLibro,
@@ -567,6 +579,20 @@ BEGIN
         FechaDevolucion = @FechaDevolucion,
         Estado = @Estado
     WHERE Id = @IdPrestamo;
+
+    -- Actualizar el estado del libro 
+    IF @Estado = 'Devuelto' 
+    BEGIN 
+        UPDATE Libro 
+        SET Estado = 'Disponible'
+        WHERE Id = @IdLibro;
+    END
+    ELSE 
+    BEGIN
+        UPDATE Libro
+        SET Estado = 'Prestado' 
+        WHERE Id = @IdLibro; 
+    END
 
     SET @MensajeSalida = 'Préstamo actualizado.';
 END;
@@ -579,3 +605,32 @@ BEGIN
     SELECT * FROM vw_DetallesPanel;
 END;
 GO
+
+-- PROCEDIMIENTO PARA EJECUTAR LA VISTA vw_ObtenerPrestamosVencidos
+CREATE PROCEDURE sp_ObtenerPrestamosVencidos
+AS
+BEGIN
+    SELECT * FROM vw_ObtenerPrestamosVencidos;
+END;
+GO
+
+-- PROCEDIMIENTO PARA ACTUALIZAR ESTADO DEL PRESTAMO Y LIBRO
+CREATE PROCEDURE sp_ActualizarPrestamosVencidos
+AS
+BEGIN
+    UPDATE Prestamo
+    SET Estado = 'Vencido'
+    WHERE FechaDevolucion < GETDATE() AND Estado != 'Devuelto';
+
+    UPDATE Libro
+    SET Estado = 'Prestado'
+    WHERE Id IN (
+        SELECT IdLibro FROM Prestamo
+        WHERE FechaDevolucion < GETDATE() AND Estado = 'Vencido'
+    );
+END;
+GO
+
+
+
+
