@@ -1,5 +1,7 @@
 package com.example.bibliosys.Models.response.dashboard;
 
+import java.sql.Date;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -12,6 +14,6 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LoanAmountXDay {
-    private String dia;
+    private Date dia;
     private Integer prestamos;
 }

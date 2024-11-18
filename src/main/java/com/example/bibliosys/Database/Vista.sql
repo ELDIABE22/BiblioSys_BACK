@@ -75,12 +75,12 @@ SELECT
 CREATE VIEW vw_CantidadPrestamosPorDia
 AS
 SELECT 
-    CONVERT(VARCHAR, FechaPrestamo, 23) AS Dia, -- YYYY-MM-DD
+    FechaPrestamo AS Dia,
     COUNT(*) AS CantidadPrestamos
 FROM 
     Prestamo
 GROUP BY 
-    CONVERT(VARCHAR, FechaPrestamo, 23);
+    FechaPrestamo;
 GO
 
 -- VISTA PARA OBTENER LA CANTIDAD DE PRESTAMOS POR MES

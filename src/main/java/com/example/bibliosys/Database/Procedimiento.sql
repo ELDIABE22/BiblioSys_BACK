@@ -107,27 +107,34 @@ GO
 
 -- PROCEDIMIENTO PARA ELIMINAR LIBRO
 CREATE PROCEDURE sp_EliminarLibro
-    @LibroId INT,
+    @IdLibro INT,
     @MensajeSalida VARCHAR(255) OUTPUT
 AS
 BEGIN
     SET @MensajeSalida = '';
 
     -- Verificar si el libro existe
-    IF NOT EXISTS (SELECT 1 FROM Libro WHERE Id = @LibroId)
+    IF NOT EXISTS (SELECT 1 FROM Libro WHERE Id = @IdLibro)
     BEGIN
         SET @MensajeSalida = 'El libro no existe.';
         RETURN;
     END
 
-    -- Eliminar relaciones con autores y materias si existen
-    DELETE FROM LibroAutor WHERE IdLibro = @LibroId;
-    DELETE FROM LibroMateria WHERE IdLibro = @LibroId;
+    -- Verificar si el libro tiene un préstamo activo
+    IF EXISTS (SELECT 1 FROM Prestamo WHERE IdLibro = @IdLibro AND Estado != 'Devuelto')
+    BEGIN
+        SET @MensajeSalida = 'No puedes eliminar el libro porque tiene un prestamo activo.';
+        RETURN;
+    END
 
+    -- Eliminar relaciones con autores y materias si existen
+    DELETE FROM LibroAutor WHERE IdLibro = @IdLibro;
+    DELETE FROM LibroMateria WHERE IdLibro = @IdLibro;
+    
     DELETE FROM Prestamo WHERE IdLibro = @IdLibro;
 
     -- Eliminar el libro
-    DELETE FROM Libro WHERE Id = @LibroId;
+    DELETE FROM Libro WHERE Id = @IdLibro;
 
     SET @MensajeSalida = 'Libro eliminado.';
 END;
@@ -225,7 +232,7 @@ CREATE PROCEDURE sp_InsertarEstudiante
     @Apellidos VARCHAR(255),
     @Correo VARCHAR(50),
     @Direccion VARCHAR(255),
-    @Telefono INT,
+    @Telefono CHAR(10),
     @Carrera VARCHAR(100),
     @Foto VARCHAR(255) = NULL,
     @MensajeSalida VARCHAR(255) OUTPUT
@@ -233,7 +240,14 @@ AS
 BEGIN
     SET @MensajeSalida = '';
 
-    -- Validar si el correo ya existe
+    -- Validar si el correo ya existe en la tabla Estudiante o Usuario
+	IF EXISTS (SELECT 1 FROM Estudiante WHERE Correo = @Correo) 
+		OR EXISTS (SELECT 1 FROM Usuario WHERE Correo = @Correo) 
+	BEGIN 
+		SET @MensajeSalida = 'El correo ya está registrado.'; 
+		RETURN; 
+	END
+
     IF EXISTS (SELECT 1 FROM Estudiante WHERE Correo = @Correo)
     BEGIN
         SET @MensajeSalida = 'El correo ya está registrado.';
@@ -254,6 +268,98 @@ BEGIN
     SET @MensajeSalida = 'Estudiante agregado.';
 END;
 GO
+
+-- PROCEDIMIENTO PARA ACTUALIZAR ESTUDIANTE
+CREATE PROCEDURE sp_ActualizarEstudiante
+    @IdEstudiante INT,
+    @Nombres VARCHAR(255),
+    @Apellidos VARCHAR(255),
+    @Correo VARCHAR(50),
+    @Direccion VARCHAR(255),
+    @Telefono CHAR(10),
+    @Carrera VARCHAR(100),
+    @Foto VARCHAR(255),
+    @Estado VARCHAR(50),
+    @MensajeSalida VARCHAR(255) OUTPUT
+AS
+BEGIN
+    SET @MensajeSalida = '';
+
+    -- Verificar si el estudiante existe
+    IF NOT EXISTS (SELECT 1 FROM Estudiante WHERE Id = @IdEstudiante)
+    BEGIN
+        SET @MensajeSalida = 'El estudiante no existe.';
+        RETURN;
+    END
+
+    -- Validar si el correo ya está en uso por otro estudiante
+    IF EXISTS (SELECT 1 FROM Estudiante WHERE Correo = @Correo AND Id != @IdEstudiante)
+    BEGIN
+        SET @MensajeSalida = 'El correo ya está registrado.';
+        RETURN;
+    END
+
+    -- Validar si el teléfono ya está en uso por otro estudiante
+    IF EXISTS (SELECT 1 FROM Estudiante WHERE Telefono = @Telefono AND Id != @IdEstudiante)
+    BEGIN
+        SET @MensajeSalida = 'El teléfono ya está registrado.';
+        RETURN;
+    END
+
+	-- Validar que el estudiante no sea Inactivo cuando tiene un préstamo activo
+	IF @Estado = 'Inactivo' AND EXISTS (SELECT 1 FROM Prestamo WHERE IdEstudiante = @IdEstudiante AND Estado != 'Devuelto')
+	BEGIN 
+		SET @MensajeSalida = 'El estudiante tiene un préstamo activo y no puede ser inactivado.'; 
+		RETURN; 
+	END
+
+    UPDATE Estudiante
+    SET 
+        Nombres = @Nombres,
+        Apellidos = @Apellidos,
+        Correo = @Correo,
+        Direccion = @Direccion,
+        Telefono = @Telefono,
+        Carrera = @Carrera,
+        Foto = @Foto,
+        Estado = @Estado
+    WHERE Id = @IdEstudiante;
+
+    SET @MensajeSalida = 'Estudiante actualizado.';
+END;
+GO
+
+-- PROCEDIMIENTO PARA ELIMINAR ESTUDIANTE
+CREATE PROCEDURE sp_EliminarEstudiante
+    @IdEstudiante INT,
+    @MensajeSalida VARCHAR(255) OUTPUT
+AS
+BEGIN
+    SET @MensajeSalida = '';
+
+    -- Verificar si el estudiante existe
+    IF NOT EXISTS (SELECT 1 FROM Estudiante WHERE Id = @IdEstudiante)
+    BEGIN
+        SET @MensajeSalida = 'El estudiante no existe.';
+        RETURN;
+    END
+
+    -- Validar si el estudiante tiene préstamos activos
+    IF EXISTS (SELECT 1 FROM Prestamo WHERE IdEstudiante = @IdEstudiante AND Estado != 'Devuelto')
+    BEGIN
+        SET @MensajeSalida = 'El estudiante tiene préstamos activos y no puede ser eliminado.';
+        RETURN;
+    END
+
+	-- Eliminara todos los préstamos
+	DELETE FROM Prestamo WHERE IdEstudiante = @IdEstudiante;
+
+    DELETE FROM Estudiante WHERE Id = @IdEstudiante;
+
+    SET @MensajeSalida = 'Estudiante eliminado.';
+END;
+GO
+
 
 -- PROCEDIMIENTO PARA ELIMINAR USUARIOS
 CREATE PROCEDURE sp_EliminarUsuario
@@ -296,12 +402,13 @@ BEGIN
         RETURN;
     END
 
-    -- Validar si el correo ya está registrado
-    IF EXISTS (SELECT 1 FROM Usuario WHERE Correo = @Correo)
-    BEGIN
-        SET @MensajeSalida = 'El correo ya está registrado.';
-        RETURN;
-    END
+    -- Validar si el correo ya existe en la tabla Estudiante o Usuario
+	IF EXISTS (SELECT 1 FROM Usuario WHERE Correo = @Correo) 
+		OR EXISTS (SELECT 1 FROM Estudiante WHERE Correo = @Correo) 
+	BEGIN 
+		SET @MensajeSalida = 'El correo ya está registrado.'; 
+		RETURN; 
+	END
 
     -- Generar una contraseña temporal
     DECLARE @ContraseñaTemporal VARCHAR(255);

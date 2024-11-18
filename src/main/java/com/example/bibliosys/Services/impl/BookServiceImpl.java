@@ -163,15 +163,17 @@ public class BookServiceImpl implements BookService {
         @Override
         public ApiResponse<Void> deleteBookService(Integer bookId) {
                 StoredProcedureQuery deleteBookQuery = entityManager.createStoredProcedureQuery("sp_EliminarLibro")
-                                .registerStoredProcedureParameter("LibroId", Integer.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("IdLibro", Integer.class, ParameterMode.IN)
                                 .registerStoredProcedureParameter("MensajeSalida", String.class, ParameterMode.OUT);
 
-                deleteBookQuery.setParameter("LibroId", bookId);
+                deleteBookQuery.setParameter("IdLibro", bookId);
 
                 deleteBookQuery.execute();
                 String mensajeSalida = (String) deleteBookQuery.getOutputParameterValue("MensajeSalida");
 
-                if ("El libro no existe.".equals(mensajeSalida)) {
+                if ("El libro no existe.".equals(mensajeSalida)
+                                | "No puedes eliminar el libro porque tiene un prestamo activo."
+                                                .equals(mensajeSalida)) {
                         return ApiResponse.<Void>builder()
                                         .data(null)
                                         .message(mensajeSalida)

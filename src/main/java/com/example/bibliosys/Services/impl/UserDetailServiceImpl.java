@@ -120,7 +120,7 @@ public class UserDetailServiceImpl implements UserDetailsService {
             if (!"Activo".equalsIgnoreCase(user.getEstado())) {
                 return ApiResponse.<AuthResponse>builder()
                         .data(null)
-                        .message("La cuenta no esta activa")
+                        .message("La cuenta no está activa")
                         .build();
             }
 

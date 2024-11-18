@@ -39,9 +39,9 @@ public class StudentServiceImpl implements StudentService {
                                 .registerStoredProcedureParameter("Apellidos", String.class, ParameterMode.IN)
                                 .registerStoredProcedureParameter("Correo", String.class, ParameterMode.IN)
                                 .registerStoredProcedureParameter("Direccion", String.class, ParameterMode.IN)
-                                .registerStoredProcedureParameter("Telefono", Integer.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("Telefono", String.class, ParameterMode.IN)
                                 .registerStoredProcedureParameter("Carrera", String.class, ParameterMode.IN)
-                                .registerStoredProcedureParameter("Foto", Integer.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("Foto", String.class, ParameterMode.IN)
                                 .registerStoredProcedureParameter("MensajeSalida", String.class, ParameterMode.OUT);
 
                 query.setParameter("Nombres", student.getNombres());
@@ -82,50 +82,81 @@ public class StudentServiceImpl implements StudentService {
 
         @Override
         public ApiResponse<Student> updateStudentService(Student student) {
-                Student existingStudent = studentRepository.findById(student.getId()).orElse(null);
+                StoredProcedureQuery query = entityManager
+                                .createStoredProcedureQuery("sp_ActualizarEstudiante")
+                                .registerStoredProcedureParameter("IdEstudiante", Integer.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("Nombres", String.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("Apellidos", String.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("Correo", String.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("Direccion", String.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("Telefono", String.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("Carrera", String.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("Foto", String.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("Estado", String.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("MensajeSalida", String.class, ParameterMode.OUT);
 
-                if (existingStudent == null) {
+                query.setParameter("IdEstudiante", student.getId());
+                query.setParameter("Nombres", student.getNombres());
+                query.setParameter("Apellidos", student.getApellidos());
+                query.setParameter("Correo", student.getCorreo());
+                query.setParameter("Direccion", student.getDireccion());
+                query.setParameter("Telefono", student.getTelefono());
+                query.setParameter("Carrera", student.getCarrera());
+                query.setParameter("Foto", student.getFoto());
+                query.setParameter("Estado", student.getEstado());
+
+                query.execute();
+                String mensajeSalida = (String) query.getOutputParameterValue("MensajeSalida");
+
+                if ("El estudiante no existe.".equals(mensajeSalida)
+                                | "El correo ya está registrado.".equals(mensajeSalida)
+                                | "El teléfono ya está registrado.".equals(mensajeSalida)
+                                | "El estudiante tiene un préstamo activo y no puede ser inactivado."
+                                                .equals(mensajeSalida)) {
                         return ApiResponse.<Student>builder()
                                         .data(null)
-                                        .message("El estudiante no existe.")
+                                        .message(mensajeSalida)
                                         .build();
                 }
 
-                Student studentWithSamePhone = studentRepository.findByTelefono(student.getTelefono());
-                if (studentWithSamePhone != null && !studentWithSamePhone.getId().equals(student.getId())) {
-                        return ApiResponse.<Student>builder()
-                                        .data(null)
-                                        .message("El teléfono ya está registrado.")
-                                        .build();
-                }
-
-                existingStudent.setNombres(student.getNombres());
-                existingStudent.setApellidos(student.getApellidos());
-                existingStudent.setCorreo(student.getCorreo());
-                existingStudent.setDireccion(student.getDireccion());
-                existingStudent.setTelefono(student.getTelefono());
-                existingStudent.setCarrera(student.getCarrera());
-                existingStudent.setFoto(student.getFoto());
-                existingStudent.setEstado(student.getEstado());
-
-                studentRepository.save(existingStudent);
+                Student studentResponse = Student.builder()
+                                .id(student.getId())
+                                .nombres(student.getNombres())
+                                .apellidos(student.getApellidos())
+                                .correo(student.getCorreo())
+                                .direccion(student.getDireccion())
+                                .telefono(student.getTelefono())
+                                .carrera(student.getCarrera())
+                                .foto(student.getFoto())
+                                .estado(student.getEstado())
+                                .build();
 
                 return ApiResponse.<Student>builder()
-                                .data(existingStudent)
-                                .message("Estudiante actualizado.")
+                                .data(studentResponse)
+                                .message(mensajeSalida)
                                 .build();
         }
 
         @Override
         public ApiResponse<Void> deleteStudentService(Integer studentId) {
-                if (!studentRepository.existsById(studentId)) {
+                StoredProcedureQuery query = entityManager
+                                .createStoredProcedureQuery("sp_EliminarEstudiante")
+                                .registerStoredProcedureParameter("IdEstudiante", Integer.class, ParameterMode.IN)
+                                .registerStoredProcedureParameter("MensajeSalida", String.class, ParameterMode.OUT);
+
+                query.setParameter("IdEstudiante", studentId);
+
+                query.execute();
+                String mensajeSalida = (String) query.getOutputParameterValue("MensajeSalida");
+
+                if ("El estudiante no existe.".equals(mensajeSalida)
+                                | "El estudiante tiene préstamos activos y no puede ser eliminado."
+                                                .equals(mensajeSalida)) {
                         return ApiResponse.<Void>builder()
                                         .data(null)
-                                        .message("El estudiante con ID " + studentId + " no existe.")
+                                        .message(mensajeSalida)
                                         .build();
                 }
-
-                studentRepository.deleteById(studentId);
 
                 return ApiResponse.<Void>builder()
                                 .data(null)
